@@ -10,7 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
@@ -28,9 +28,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class NotificationControllerTest extends ControllerTestSupport {
 
     @Autowired MockMvc mockMvc;
-    @MockBean NotificationService notificationService;
-    @MockBean StudyTopicService studyTopicService;
-    @MockBean JwtProvider jwtProvider;
+    @MockitoBean NotificationService notificationService;
+    @MockitoBean StudyTopicService studyTopicService;
+    @MockitoBean JwtProvider jwtProvider;
 
     private User mockUser;
 
@@ -98,3 +98,4 @@ class NotificationControllerTest extends ControllerTestSupport {
                 .andExpect(status().isUnauthorized());
     }
 }
+

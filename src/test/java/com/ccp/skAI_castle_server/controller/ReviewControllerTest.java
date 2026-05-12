@@ -11,7 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -29,9 +29,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ReviewControllerTest extends ControllerTestSupport {
 
     @Autowired MockMvc mockMvc;
-    @MockBean ReviewService reviewService;
-    @MockBean StudyTopicService studyTopicService;
-    @MockBean JwtProvider jwtProvider;
+    @MockitoBean ReviewService reviewService;
+    @MockitoBean StudyTopicService studyTopicService;
+    @MockitoBean JwtProvider jwtProvider;
 
     private User mockUser;
 
@@ -113,3 +113,4 @@ class ReviewControllerTest extends ControllerTestSupport {
                 .andExpect(status().isBadRequest());
     }
 }
+
