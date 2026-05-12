@@ -45,7 +45,7 @@ public class ReviewService {
         EvaluationQuestion question = evaluationQuestionRepository.findByIdAndEvaluationUser(questionId, user)
                 .orElseThrow(() -> new ApiException(QUESTION_NOT_FOUND));
 
-        int score = scoringService.score(userAnswer, question.getModelAnswer(), question.getKeywords());
+        int score = scoringService.score(question.getQuestion(), userAnswer, question.getModelAnswer(), question.getKeywords());
 
         double ef = question.getEf() != null ? question.getEf() : 2.5;
         int lastInterval = question.getLastInterval() != null ? question.getLastInterval() : 1;
