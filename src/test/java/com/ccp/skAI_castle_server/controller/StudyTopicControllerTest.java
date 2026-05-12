@@ -11,7 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -29,8 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class StudyTopicControllerTest extends ControllerTestSupport {
 
     @Autowired MockMvc mockMvc;
-    @MockBean StudyTopicService studyTopicService;
-    @MockBean JwtProvider jwtProvider;
+    @MockitoBean StudyTopicService studyTopicService;
+    @MockitoBean JwtProvider jwtProvider;
 
     private User mockUser;
 
@@ -137,3 +137,4 @@ class StudyTopicControllerTest extends ControllerTestSupport {
                 .andExpect(jsonPath("$.data.topicId").value(1));
     }
 }
+
