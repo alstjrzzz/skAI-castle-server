@@ -9,6 +9,8 @@ bin/
 .env*
 schema.sql
 data.sql
+src/main/resources/application-local.yml
+src/main/resources/application-secret.yml
 
 ### Java & OS ###
 *.class

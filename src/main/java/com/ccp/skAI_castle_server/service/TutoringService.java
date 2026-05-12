@@ -121,12 +121,11 @@ public class TutoringService {
         List<LlmService.QuestionData> questionDataList = llmService.generateQuestions(outlineJson, history);
 
         // Create Evaluation record (score not yet set)
-        Evaluation evaluation = Evaluation.builder()
+        Evaluation evaluation = evaluationRepository.save(Evaluation.builder()
                 .user(user)
                 .studyTopic(session.getStudyTopic())
                 .chatSession(session)
-                .build();
-        evaluationRepository.save(evaluation);
+                .build());
 
         // Save generated questions (model answers stored, not exposed to user yet)
         List<FinishSessionResponse.QuestionItem> questionItems = new ArrayList<>();
@@ -134,14 +133,13 @@ public class TutoringService {
             LlmService.QuestionData qd = questionDataList.get(i);
             String keywordsJson = serializeKeywords(qd.keywords());
 
-            EvaluationQuestion question = EvaluationQuestion.builder()
+            EvaluationQuestion question = evaluationQuestionRepository.save(EvaluationQuestion.builder()
                     .evaluation(evaluation)
                     .questionOrder(i + 1)
                     .question(qd.question())
                     .modelAnswer(qd.modelAnswer())
                     .keywords(keywordsJson)
-                    .build();
-            evaluationQuestionRepository.save(question);
+                    .build());
 
             questionItems.add(FinishSessionResponse.QuestionItem.builder()
                     .id(question.getId())
