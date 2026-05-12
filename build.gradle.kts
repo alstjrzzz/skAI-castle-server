@@ -42,6 +42,9 @@ dependencies {
 	testCompileOnly("org.projectlombok:lombok")
 	testAnnotationProcessor("org.projectlombok:lombok")
 
+	// .env support
+	implementation("io.github.cdimascio:dotenv-java:5.2.2")
+
 	// API Documentation
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
 
