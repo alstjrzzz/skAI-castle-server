@@ -6,16 +6,15 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-public class OpenAiConfig {
+public class AiServerConfig {
 
-    @Value("${openai.api-key}")
-    private String apiKey;
+    @Value("${ai-server.base-url:http://localhost:8000}")
+    private String baseUrl;
 
-    @Bean("openAiRestClient")
-    public RestClient openAiRestClient(RestClient.Builder builder) {
+    @Bean("aiServerRestClient")
+    public RestClient aiServerRestClient(RestClient.Builder builder) {
         return builder
-                .baseUrl("https://api.openai.com/v1")
-                .defaultHeader("Authorization", "Bearer " + apiKey)
+                .baseUrl(baseUrl)
                 .build();
     }
 }

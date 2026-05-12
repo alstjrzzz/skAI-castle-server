@@ -7,13 +7,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import static com.ccp.skAI_castle_server.dto.response.ApiResultCode.EXTERNAL_API_ERROR;
 
@@ -22,39 +22,27 @@ import static com.ccp.skAI_castle_server.dto.response.ApiResultCode.EXTERNAL_API
 public class LlmService {
 
     private final RestClient restClient;
-    private final String chatModel;
-    private final String embeddingModel;
     private final ObjectMapper objectMapper;
 
     public record QuestionData(String question, String modelAnswer, List<String> keywords) {}
 
     public LlmService(
-            @Qualifier("openAiRestClient") RestClient restClient,
-            @Value("${openai.chat-model:gpt-4o-mini}") String chatModel,
-            @Value("${openai.embedding-model:text-embedding-3-small}") String embeddingModel,
+            @Qualifier("aiServerRestClient") RestClient restClient,
             ObjectMapper objectMapper) {
         this.restClient = restClient;
-        this.chatModel = chatModel;
-        this.embeddingModel = embeddingModel;
         this.objectMapper = objectMapper;
     }
 
-    private String callChat(List<Map<String, String>> messages, boolean jsonMode) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("model", chatModel);
-        body.put("messages", messages);
-        if (jsonMode) {
-            body.put("response_format", Map.of("type", "json_object"));
-        }
+    private String callChat(List<Map<String, String>> messages) {
+        Map<String, Object> body = Map.of("messages", messages);
         try {
             String response = restClient.post()
-                    .uri("/chat/completions")
+                    .uri("/v1/llm/chat")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
                     .body(String.class);
-            return objectMapper.readTree(response)
-                    .path("choices").get(0).path("message").path("content").asText();
+            return objectMapper.readTree(response).path("content").asText();
         } catch (Exception e) {
             throw new ApiException(EXTERNAL_API_ERROR, e);
         }
@@ -71,7 +59,7 @@ public class LlmService {
                         "\nGenerate 4-6 chapters, each with 3-5 keywords.")
         );
         try {
-            String json = callChat(messages, true);
+            String json = callChat(messages);
             return objectMapper.readValue(json, OutlineDto.class);
         } catch (ApiException e) {
             throw e;
@@ -95,7 +83,7 @@ public class LlmService {
             messages.add(Map.of("role", msg.getRole().name().toLowerCase(), "content", msg.getContent()));
         }
 
-        return callChat(messages, false);
+        return callChat(messages);
     }
 
     public List<QuestionData> generateQuestions(String outlineJson, List<ChatMessage> history) {
@@ -119,7 +107,7 @@ public class LlmService {
         );
 
         try {
-            String json = callChat(messages, true);
+            String json = callChat(messages);
             JsonNode root = objectMapper.readTree(json);
             JsonNode questionsNode = root.isArray() ? root : root.path("questions");
 
@@ -156,39 +144,10 @@ public class LlmService {
         );
 
         try {
-            return callChat(messages, false);
+            return callChat(messages);
         } catch (Exception e) {
             log.warn("Feedback generation failed, returning default feedback", e);
             return "총점 " + score + "점입니다. 복습을 통해 부족한 부분을 보완해 보세요.";
-        }
-    }
-
-    public List<double[]> getEmbeddings(List<String> texts) {
-        if (texts.isEmpty()) return List.of();
-
-        Map<String, Object> body = Map.of("model", embeddingModel, "input", texts);
-
-        try {
-            String response = restClient.post()
-                    .uri("/embeddings")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .retrieve()
-                    .body(String.class);
-
-            JsonNode data = objectMapper.readTree(response).path("data");
-            double[][] result = new double[texts.size()][];
-            for (JsonNode item : data) {
-                int idx = item.path("index").asInt();
-                JsonNode embNode = item.path("embedding");
-                double[] emb = new double[embNode.size()];
-                for (int j = 0; j < embNode.size(); j++) emb[j] = embNode.get(j).asDouble();
-                result[idx] = emb;
-            }
-            return Arrays.asList(result);
-        } catch (Exception e) {
-            log.warn("Embedding API failed, falling back to zero vectors", e);
-            return texts.stream().map(t -> new double[0]).collect(Collectors.toList());
         }
     }
 }

@@ -207,7 +207,7 @@ public class TutoringService {
             EvaluationQuestion q = questionMap.get(answerItem.getQuestionId());
             if (q == null) throw new ApiException(QUESTION_NOT_FOUND);
 
-            int qScore = scoringService.score(answerItem.getUserAnswer(), q.getModelAnswer(), q.getKeywords());
+            int qScore = scoringService.score(q.getQuestion(), answerItem.getUserAnswer(), q.getModelAnswer(), q.getKeywords());
             scores.add(qScore);
 
             // Set user answer and initial SM-2 review schedule
