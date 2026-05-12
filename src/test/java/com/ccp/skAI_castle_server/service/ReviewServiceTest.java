@@ -89,7 +89,7 @@ class ReviewServiceTest {
 
         given(evaluationQuestionRepository.findByIdAndEvaluationUser(1L, testUser))
                 .willReturn(Optional.of(question));
-        given(scoringService.score(anyString(), anyString(), anyString())).willReturn(75);
+        given(scoringService.score(anyString(), anyString(), anyString(), anyString())).willReturn(75);
         given(sm2Service.compute(anyInt(), anyInt(), any(Double.class), anyInt()))
                 .willReturn(new Sm2Service.Sm2Result(LocalDate.now().plusDays(6), 2, 2.5, 6));
 

@@ -6,94 +6,82 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
+import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 
+@SuppressWarnings("unchecked")
 @ExtendWith(MockitoExtension.class)
 class ScoringServiceTest {
 
-    @Mock
-    private LlmService llmService;
+    @Mock RestClient restClient;
+    @Mock RestClient.RequestBodyUriSpec requestBodyUriSpec;
+    @Mock RestClient.RequestBodySpec requestBodySpec;
+    @Mock RestClient.ResponseSpec responseSpec;
 
     private ScoringService scoringService;
 
+    private static final String RESPONSE_79 =
+            "{\"scores\":{\"denseScore\":80.0,\"sparseScore\":70.0,\"keywordScore\":90.0,\"totalScore\":79.5}," +
+            "\"evidence\":{\"matchedKeywords\":[],\"normalizedStudentAnswer\":\"\",\"normalizedModelAnswer\":\"\"}}";
+
     @BeforeEach
     void setUp() {
-        scoringService = new ScoringService(llmService, new ObjectMapper());
+        scoringService = new ScoringService(restClient, new ObjectMapper());
+        given(restClient.post()).willReturn(requestBodyUriSpec);
+        given(requestBodyUriSpec.uri(anyString())).willReturn(requestBodySpec);
+        given(requestBodySpec.contentType(any())).willReturn(requestBodySpec);
+        given(requestBodySpec.body(any(Object.class))).willReturn(requestBodySpec);
+        given(requestBodySpec.retrieve()).willReturn(responseSpec);
     }
 
     @Test
-    void score_identicalEmbeddings_highScore() {
-        double[] emb = {0.6, 0.5, 0.4, 0.3};
-        given(llmService.getEmbeddings(anyList())).willReturn(List.of(emb, emb));
+    void score_successResponse_returnsTotalScore() {
+        given(responseSpec.body(String.class)).willReturn(RESPONSE_79);
 
-        String answer = "supervised learning trains on labeled data";
-        int score = scoringService.score(answer, answer, "[\"supervised\",\"labeled\",\"data\"]");
+        int score = scoringService.score("What is ML?", "supervised learning", "supervised learning", "[\"supervised\"]");
 
-        assertThat(score).isGreaterThan(80);
+        assertThat(score).isEqualTo(80); // round(79.5)
     }
 
     @Test
-    void score_noEmbeddings_fallsBackToSparseAndKeyword() {
-        given(llmService.getEmbeddings(anyList())).willReturn(List.of(new double[0], new double[0]));
+    void score_apiError_returnsZero() {
+        given(responseSpec.body(String.class)).willThrow(new RuntimeException("Connection refused"));
 
-        String answer = "machine learning uses data to train models";
-        int score = scoringService.score(answer, answer, "[\"machine\",\"learning\",\"data\"]");
+        int score = scoringService.score("Q", "some answer", "model answer", "[]");
 
-        assertThat(score).isGreaterThan(50);
+        assertThat(score).isEqualTo(0);
     }
 
     @Test
-    void score_completelyIrrelevantAnswer_lowScore() {
-        given(llmService.getEmbeddings(anyList())).willReturn(List.of(new double[0], new double[0]));
+    void score_totalScoreAbove100_cappedAt100() {
+        given(responseSpec.body(String.class)).willReturn(
+                "{\"scores\":{\"totalScore\":150.0},\"evidence\":{}}");
 
-        int score = scoringService.score(
-                "pizza is delicious food",
-                "supervised learning uses labeled training data to build predictive models",
-                "[\"supervised\",\"labeled\",\"training\",\"predictive\"]"
-        );
+        int score = scoringService.score("Q", "A", "B", "[]");
 
-        assertThat(score).isLessThan(30);
+        assertThat(score).isEqualTo(100);
     }
 
     @Test
-    void score_veryShortAnswer_penalizedByLengthFactor() {
-        given(llmService.getEmbeddings(anyList())).willReturn(List.of(new double[0], new double[0]));
+    void score_totalScoreNegative_floorsAt0() {
+        given(responseSpec.body(String.class)).willReturn(
+                "{\"scores\":{\"totalScore\":-5.0},\"evidence\":{}}");
 
-        // userAnswer is only 1 word vs model answer of many words → ratio < 0.3 → penalty
-        int score = scoringService.score(
-                "yes",
-                "supervised learning is a machine learning paradigm where the model learns from labeled examples",
-                "[\"supervised\",\"labeled\"]"
-        );
+        int score = scoringService.score("Q", "A", "B", "[]");
 
-        assertThat(score).isLessThan(40);
+        assertThat(score).isEqualTo(0);
     }
 
     @Test
-    void score_alwaysBetween0And100() {
-        given(llmService.getEmbeddings(anyList())).willReturn(List.of(new double[0], new double[0]));
+    void score_nullKeywords_sendsEmptyList() {
+        given(responseSpec.body(String.class)).willReturn(RESPONSE_79);
 
-        int score1 = scoringService.score("", "model answer text", "[]");
-        int score2 = scoringService.score("perfect answer with all keywords", "perfect answer with all keywords",
-                "[\"perfect\",\"answer\",\"keywords\"]");
+        int score = scoringService.score("Q", "answer", "model", null);
 
-        assertThat(score1).isBetween(0, 100);
-        assertThat(score2).isBetween(0, 100);
-    }
-
-    @Test
-    void score_emptyKeywords_defaultsToHalfCredit() {
-        given(llmService.getEmbeddings(anyList())).willReturn(List.of(new double[0], new double[0]));
-
-        // With no keywords, keywordMatchRatio returns 0.5 by default
-        int score = scoringService.score("some answer text here", "some answer text here", "[]");
-
-        // Bag-of-words similarity should be 1.0 (identical), keyword defaults to 0.5 → decent score
-        assertThat(score).isGreaterThan(40);
+        assertThat(score).isBetween(0, 100);
     }
 }
