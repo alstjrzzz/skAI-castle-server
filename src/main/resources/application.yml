@@ -3,6 +3,8 @@ server:
     context-path: ${SERVER_API_PREFIX}
 
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: skAI-castle-server
   servlet:

@@ -171,4 +171,47 @@ class TutoringServiceTest {
                 .isInstanceOf(ApiException.class)
                 .satisfies(e -> assertThat(((ApiException) e).getResultCode()).isEqualTo(EVALUATION_ALREADY_SUBMITTED));
     }
+
+    @Test
+    void getEvaluationResult_success_returnsScoreAndQuestions() {
+        ChatSession session = ChatSession.builder().user(testUser).studyTopic(testTopic).build();
+        ReflectionTestUtils.setField(session, "id", 10L);
+
+        Evaluation scored = Evaluation.builder()
+                .user(testUser).studyTopic(testTopic).chatSession(session).build();
+        scored.updateResult(78, "피드백 내용");
+
+        EvaluationQuestion q = EvaluationQuestion.builder()
+                .evaluation(scored).questionOrder(1).question("Q1?")
+                .modelAnswer("Model A1").keywords("[\"key1\"]").build();
+        ReflectionTestUtils.setField(q, "id", 1L);
+
+        given(chatSessionRepository.findByIdAndUser(10L, testUser)).willReturn(Optional.of(session));
+        given(evaluationRepository.findByChatSession(session)).willReturn(Optional.of(scored));
+        given(evaluationQuestionRepository.findByEvaluationOrderByQuestionOrderAsc(scored))
+                .willReturn(List.of(q));
+
+        var result = tutoringService.getEvaluationResult(10L, testUser);
+
+        assertThat(result.getScore()).isEqualTo(78);
+        assertThat(result.getFeedback()).isEqualTo("피드백 내용");
+        assertThat(result.getQuestions()).hasSize(1);
+        assertThat(result.getQuestions().get(0).getQuestion()).isEqualTo("Q1?");
+    }
+
+    @Test
+    void getEvaluationResult_notScoredYet_throwsApiException() {
+        ChatSession session = ChatSession.builder().user(testUser).studyTopic(testTopic).build();
+        ReflectionTestUtils.setField(session, "id", 10L);
+
+        Evaluation unscored = Evaluation.builder()
+                .user(testUser).studyTopic(testTopic).chatSession(session).build();
+
+        given(chatSessionRepository.findByIdAndUser(10L, testUser)).willReturn(Optional.of(session));
+        given(evaluationRepository.findByChatSession(session)).willReturn(Optional.of(unscored));
+
+        assertThatThrownBy(() -> tutoringService.getEvaluationResult(10L, testUser))
+                .isInstanceOf(ApiException.class)
+                .satisfies(e -> assertThat(((ApiException) e).getResultCode()).isEqualTo(EVALUATION_NOT_FOUND));
+    }
 }

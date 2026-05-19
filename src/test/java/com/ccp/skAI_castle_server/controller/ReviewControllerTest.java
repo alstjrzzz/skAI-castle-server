@@ -55,7 +55,7 @@ class ReviewControllerTest extends ControllerTestSupport {
                         .build()
         ));
 
-        mockMvc.perform(get("/api/reviews/today").with(mockAuth()))
+        mockMvc.perform(get("/reviews/today").with(mockAuth()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].questionId").value(1))
                 .andExpect(jsonPath("$.data[0].question").value("What is gradient descent?"))
@@ -64,7 +64,7 @@ class ReviewControllerTest extends ControllerTestSupport {
 
     @Test
     void getTodayReviews_unauthenticated_returns401() throws Exception {
-        mockMvc.perform(get("/api/reviews/today"))
+        mockMvc.perform(get("/reviews/today"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -72,7 +72,7 @@ class ReviewControllerTest extends ControllerTestSupport {
     void getTodayReviews_noCards_returnsEmptyList() throws Exception {
         given(reviewService.getTodayReviews(mockUser)).willReturn(List.of());
 
-        mockMvc.perform(get("/api/reviews/today").with(mockAuth()))
+        mockMvc.perform(get("/reviews/today").with(mockAuth()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data").isEmpty());
@@ -89,7 +89,7 @@ class ReviewControllerTest extends ControllerTestSupport {
         given(reviewService.completeReview(eq(1L), eq("An optimization algorithm"), eq(mockUser)))
                 .willReturn(result);
 
-        mockMvc.perform(post("/api/reviews/1/complete")
+        mockMvc.perform(post("/reviews/1/complete")
                         .with(mockAuth())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -103,7 +103,7 @@ class ReviewControllerTest extends ControllerTestSupport {
 
     @Test
     void completeReview_blankAnswer_returns400() throws Exception {
-        mockMvc.perform(post("/api/reviews/1/complete")
+        mockMvc.perform(post("/reviews/1/complete")
                         .with(mockAuth())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -111,6 +111,45 @@ class ReviewControllerTest extends ControllerTestSupport {
                                 {"answer":""}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getReviewCard_authenticated_returns200() throws Exception {
+        ReviewCardResponse card = ReviewCardResponse.builder()
+                .questionId(1L)
+                .question("What is gradient descent?")
+                .topicTitle("ML Fundamentals")
+                .reviewCount(1)
+                .reviewDate(LocalDate.now())
+                .build();
+        given(reviewService.getReviewCard(eq(1L), eq(mockUser))).willReturn(card);
+
+        mockMvc.perform(get("/reviews/1").with(mockAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.questionId").value(1))
+                .andExpect(jsonPath("$.data.question").value("What is gradient descent?"));
+    }
+
+    @Test
+    void getReviewCard_unauthenticated_returns401() throws Exception {
+        mockMvc.perform(get("/reviews/1"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getReviewResult_authenticated_returns200() throws Exception {
+        ReviewResultResponse result = ReviewResultResponse.builder()
+                .score(80)
+                .modelAnswer("Gradient descent minimizes the loss by following the negative gradient.")
+                .nextReviewDate(LocalDate.now().plusDays(6))
+                .reviewCount(2)
+                .build();
+        given(reviewService.getReviewResult(eq(1L), eq(mockUser))).willReturn(result);
+
+        mockMvc.perform(get("/reviews/1/result").with(mockAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.score").value(80))
+                .andExpect(jsonPath("$.data.reviewCount").value(2));
     }
 }
 

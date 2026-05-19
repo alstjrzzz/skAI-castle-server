@@ -32,6 +32,7 @@ class StudyTopicServiceTest {
 
     @Mock StudyTopicRepository studyTopicRepository;
     @Mock ChatSessionRepository chatSessionRepository;
+    @Mock ChatMessageRepository chatMessageRepository;
     @Mock EvaluationRepository evaluationRepository;
     @Mock EvaluationQuestionRepository evaluationQuestionRepository;
     @Mock UserRepository userRepository;
@@ -43,8 +44,9 @@ class StudyTopicServiceTest {
     @BeforeEach
     void setUp() {
         studyTopicService = new StudyTopicService(
-                studyTopicRepository, chatSessionRepository, evaluationRepository,
-                evaluationQuestionRepository, userRepository, llmService, new ObjectMapper()
+                studyTopicRepository, chatSessionRepository, chatMessageRepository,
+                evaluationRepository, evaluationQuestionRepository, userRepository,
+                llmService, new ObjectMapper()
         );
         testUser = User.builder()
                 .email("test@example.com").password("encoded")

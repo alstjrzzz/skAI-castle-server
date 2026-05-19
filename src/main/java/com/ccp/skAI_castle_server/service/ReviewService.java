@@ -52,13 +52,40 @@ public class ReviewService {
 
         Sm2Service.Sm2Result sm2 = sm2Service.compute(score, question.getReviewCount(), ef, lastInterval);
 
-        question.applySmResult(sm2.nextReviewDate(), sm2.reviewCount(), sm2.ef(), sm2.lastInterval());
+        question.applySmResult(sm2.nextReviewDate(), sm2.reviewCount(), sm2.ef(), sm2.lastInterval(), score);
 
         return ReviewResultResponse.builder()
                 .score(score)
                 .modelAnswer(question.getModelAnswer())
                 .nextReviewDate(sm2.nextReviewDate())
                 .reviewCount(sm2.reviewCount())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewCardResponse getReviewCard(Long questionId, User user) {
+        EvaluationQuestion question = evaluationQuestionRepository.findByIdAndEvaluationUser(questionId, user)
+                .orElseThrow(() -> new ApiException(QUESTION_NOT_FOUND));
+
+        return ReviewCardResponse.builder()
+                .questionId(question.getId())
+                .question(question.getQuestion())
+                .topicTitle(question.getEvaluation().getStudyTopic().getTitle())
+                .reviewCount(question.getReviewCount())
+                .reviewDate(question.getNextReviewDate())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewResultResponse getReviewResult(Long questionId, User user) {
+        EvaluationQuestion question = evaluationQuestionRepository.findByIdAndEvaluationUser(questionId, user)
+                .orElseThrow(() -> new ApiException(QUESTION_NOT_FOUND));
+
+        return ReviewResultResponse.builder()
+                .score(question.getLastScore() != null ? question.getLastScore() : 0)
+                .modelAnswer(question.getModelAnswer())
+                .nextReviewDate(question.getNextReviewDate())
+                .reviewCount(question.getReviewCount())
                 .build();
     }
 }

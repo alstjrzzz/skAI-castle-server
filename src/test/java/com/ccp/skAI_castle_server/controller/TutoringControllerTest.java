@@ -51,7 +51,7 @@ class TutoringControllerTest extends ControllerTestSupport {
                 .messages(List.of()).createdAt(LocalDateTime.now()).build();
         given(tutoringService.createSession(1L, mockUser)).willReturn(session);
 
-        mockMvc.perform(post("/api/sessions")
+        mockMvc.perform(post("/sessions")
                         .with(mockAuth())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -65,7 +65,7 @@ class TutoringControllerTest extends ControllerTestSupport {
 
     @Test
     void createSession_unauthenticated_returns401() throws Exception {
-        mockMvc.perform(post("/api/sessions")
+        mockMvc.perform(post("/sessions")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -81,7 +81,7 @@ class TutoringControllerTest extends ControllerTestSupport {
                 .messages(List.of()).createdAt(LocalDateTime.now()).build();
         given(tutoringService.getSession(10L, mockUser)).willReturn(session);
 
-        mockMvc.perform(get("/api/sessions/10").with(mockAuth()))
+        mockMvc.perform(get("/sessions/10").with(mockAuth()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(10));
     }
@@ -93,7 +93,7 @@ class TutoringControllerTest extends ControllerTestSupport {
                 .turnNumber(1).build();
         given(tutoringService.chat(eq(10L), eq("What is overfitting?"), eq(mockUser))).willReturn(aiMsg);
 
-        mockMvc.perform(post("/api/sessions/10/chat")
+        mockMvc.perform(post("/sessions/10/chat")
                         .with(mockAuth())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,7 +110,7 @@ class TutoringControllerTest extends ControllerTestSupport {
         given(tutoringService.chat(eq(10L), any(), eq(mockUser)))
                 .willThrow(new ApiException(SESSION_NOT_ACTIVE));
 
-        mockMvc.perform(post("/api/sessions/10/chat")
+        mockMvc.perform(post("/sessions/10/chat")
                         .with(mockAuth())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -132,7 +132,7 @@ class TutoringControllerTest extends ControllerTestSupport {
                 .build();
         given(tutoringService.finishSession(10L, mockUser)).willReturn(finish);
 
-        mockMvc.perform(post("/api/sessions/10/finish")
+        mockMvc.perform(post("/sessions/10/finish")
                         .with(mockAuth())
                         .with(csrf()))
                 .andExpect(status().isOk())
@@ -149,7 +149,7 @@ class TutoringControllerTest extends ControllerTestSupport {
                 .build();
         given(tutoringService.evaluate(eq(10L), any(), eq(mockUser))).willReturn(result);
 
-        mockMvc.perform(post("/api/sessions/10/evaluate")
+        mockMvc.perform(post("/sessions/10/evaluate")
                         .with(mockAuth())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -163,7 +163,7 @@ class TutoringControllerTest extends ControllerTestSupport {
 
     @Test
     void evaluate_emptyAnswers_returns400() throws Exception {
-        mockMvc.perform(post("/api/sessions/10/evaluate")
+        mockMvc.perform(post("/sessions/10/evaluate")
                         .with(mockAuth())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -171,6 +171,27 @@ class TutoringControllerTest extends ControllerTestSupport {
                                 {"answers":[]}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getEvaluationResult_authenticated_returns200() throws Exception {
+        EvaluationResultResponse result = EvaluationResultResponse.builder()
+                .evaluationId(5L).score(75)
+                .feedback("잘했어요!")
+                .questions(List.of())
+                .build();
+        given(tutoringService.getEvaluationResult(10L, mockUser)).willReturn(result);
+
+        mockMvc.perform(get("/sessions/10/result").with(mockAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.score").value(75))
+                .andExpect(jsonPath("$.data.feedback").value("잘했어요!"));
+    }
+
+    @Test
+    void getEvaluationResult_unauthenticated_returns401() throws Exception {
+        mockMvc.perform(get("/sessions/10/result"))
+                .andExpect(status().isUnauthorized());
     }
 }
 

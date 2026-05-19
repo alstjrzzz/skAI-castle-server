@@ -54,7 +54,7 @@ class NotificationControllerTest extends ControllerTestSupport {
                         .build()
         ));
 
-        mockMvc.perform(get("/api/notifications").with(mockAuth()))
+        mockMvc.perform(get("/notifications").with(mockAuth()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].id").value(1))
                 .andExpect(jsonPath("$.data[0].link").value("/reviews/today"));
@@ -62,7 +62,7 @@ class NotificationControllerTest extends ControllerTestSupport {
 
     @Test
     void getNotifications_unauthenticated_returns401() throws Exception {
-        mockMvc.perform(get("/api/notifications"))
+        mockMvc.perform(get("/notifications"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -70,7 +70,7 @@ class NotificationControllerTest extends ControllerTestSupport {
     void markAsRead_authenticated_returns200() throws Exception {
         willDoNothing().given(notificationService).markAsRead(1L, mockUser);
 
-        mockMvc.perform(patch("/api/notifications/1/read")
+        mockMvc.perform(patch("/notifications/1/read")
                         .with(mockAuth())
                         .with(csrf()))
                 .andExpect(status().isOk())
@@ -83,7 +83,7 @@ class NotificationControllerTest extends ControllerTestSupport {
     void markAllAsRead_authenticated_returns200() throws Exception {
         willDoNothing().given(notificationService).markAllAsRead(mockUser);
 
-        mockMvc.perform(patch("/api/notifications/read-all")
+        mockMvc.perform(patch("/notifications/read-all")
                         .with(mockAuth())
                         .with(csrf()))
                 .andExpect(status().isOk())
@@ -94,7 +94,7 @@ class NotificationControllerTest extends ControllerTestSupport {
 
     @Test
     void markAllAsRead_unauthenticated_returns401() throws Exception {
-        mockMvc.perform(patch("/api/notifications/read-all").with(csrf()))
+        mockMvc.perform(patch("/notifications/read-all").with(csrf()))
                 .andExpect(status().isUnauthorized());
     }
 }

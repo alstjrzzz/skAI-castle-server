@@ -110,4 +110,70 @@ class ReviewServiceTest {
                 .isInstanceOf(ApiException.class)
                 .satisfies(e -> assertThat(((ApiException) e).getResultCode()).isEqualTo(QUESTION_NOT_FOUND));
     }
+
+    @Test
+    void getReviewCard_success_returnsMappedCard() {
+        EvaluationQuestion question = mock(EvaluationQuestion.class);
+        Evaluation evaluation = mock(Evaluation.class);
+        StudyTopic topic = mock(StudyTopic.class);
+
+        given(question.getId()).willReturn(1L);
+        given(question.getQuestion()).willReturn("What is gradient descent?");
+        given(question.getEvaluation()).willReturn(evaluation);
+        given(question.getReviewCount()).willReturn(3);
+        given(question.getNextReviewDate()).willReturn(LocalDate.now());
+        given(evaluation.getStudyTopic()).willReturn(topic);
+        given(topic.getTitle()).willReturn("ML Fundamentals");
+        given(evaluationQuestionRepository.findByIdAndEvaluationUser(1L, testUser))
+                .willReturn(Optional.of(question));
+
+        ReviewCardResponse card = reviewService.getReviewCard(1L, testUser);
+
+        assertThat(card.getQuestionId()).isEqualTo(1L);
+        assertThat(card.getQuestion()).isEqualTo("What is gradient descent?");
+        assertThat(card.getTopicTitle()).isEqualTo("ML Fundamentals");
+        assertThat(card.getReviewCount()).isEqualTo(3);
+    }
+
+    @Test
+    void getReviewCard_notFound_throwsApiException() {
+        given(evaluationQuestionRepository.findByIdAndEvaluationUser(99L, testUser))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> reviewService.getReviewCard(99L, testUser))
+                .isInstanceOf(ApiException.class)
+                .satisfies(e -> assertThat(((ApiException) e).getResultCode()).isEqualTo(QUESTION_NOT_FOUND));
+    }
+
+    @Test
+    void getReviewResult_success_returnsStoredScore() {
+        EvaluationQuestion question = EvaluationQuestion.builder()
+                .evaluation(mock(Evaluation.class))
+                .questionOrder(1)
+                .question("What is gradient descent?")
+                .modelAnswer("An optimization algorithm that minimizes loss.")
+                .keywords("[\"gradient\",\"optimization\"]")
+                .build();
+        question.initReviewSchedule(LocalDate.now().plusDays(1));
+        question.applySmResult(LocalDate.now().plusDays(6), 2, 2.5, 6, 80);
+
+        given(evaluationQuestionRepository.findByIdAndEvaluationUser(1L, testUser))
+                .willReturn(Optional.of(question));
+
+        ReviewResultResponse result = reviewService.getReviewResult(1L, testUser);
+
+        assertThat(result.getScore()).isEqualTo(80);
+        assertThat(result.getReviewCount()).isEqualTo(2);
+        assertThat(result.getModelAnswer()).isEqualTo("An optimization algorithm that minimizes loss.");
+    }
+
+    @Test
+    void getReviewResult_notFound_throwsApiException() {
+        given(evaluationQuestionRepository.findByIdAndEvaluationUser(99L, testUser))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> reviewService.getReviewResult(99L, testUser))
+                .isInstanceOf(ApiException.class)
+                .satisfies(e -> assertThat(((ApiException) e).getResultCode()).isEqualTo(QUESTION_NOT_FOUND));
+    }
 }

@@ -420,4 +420,14 @@ public interface TutoringApi {
             @Valid @RequestBody EvaluateRequest request,
             @AuthenticationPrincipal PrincipalDetails principal
     );
+
+    @Operation(
+            summary = "Get completed evaluation result",
+            description = "Returns the full evaluation result (score, feedback, questions with model answers) for an already-submitted evaluation."
+    )
+    @GetMapping("/{sessionId}/result")
+    ResponseEntity<ApiResponse<EvaluationResultResponse>> getEvaluationResult(
+            @Parameter(description = "Chat session ID", example = "1") @PathVariable Long sessionId,
+            @AuthenticationPrincipal PrincipalDetails principal
+    );
 }

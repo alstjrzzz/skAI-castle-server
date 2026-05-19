@@ -39,40 +39,6 @@ services:
     networks:
       - skAI-castle-network
 
-  backend:
-    build:
-      context: .
-    container_name: skAI-castle-backend
-    depends_on:
-      postgres:
-        condition: service_healthy
-      ai-server:
-        condition: service_started
-    ports:
-      - "8080:8080"
-    environment:
-      - SERVER_API_PREFIX=/api
-      - DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
-      - DATASOURCE_URL=jdbc:postgresql://postgres:5432/skAI-castle
-      - DATASOURCE_USERNAME=${DATASOURCE_USERNAME:-skAI-castle}
-      - DATASOURCE_PASSWORD=${DATASOURCE_PASSWORD:-skAI-castle}
-      - JPA_SHOW_SQL=false
-      - JPA_HIBERNATE_DDL_AUTO=none
-      - SQL_INIT_OPT=always
-      - MAIL_HOST=smtp.gmail.com
-      - MAIL_PORT=587
-      - MAIL_USERNAME=${MAIL_USERNAME:-skAI-castle@gmail.com}
-      - MAIL_PASSWORD=${MAIL_PASSWORD:-skAI-castle}
-      - JWT_SECRET=${JWT_SECRET:-b6af1aeb8008ac10286dc12d56ba2a38b3f05716702205d064061311f525cd93}
-      - JWT_ISSUER=skAI-castle-server
-      - JWT_ACCESS_EXPIRATION=3600000
-      - JWT_REFRESH_EXPIRATION=604800000
-      - CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8081,http://localhost:8082
-      - AI_SERVER_BASE_URL=http://ai-server:8000
-      - SPRING_DOCKER_COMPOSE_ENABLED=false
-    restart: unless-stopped
-    networks:
-      - skAI-castle-network
 
 networks:
   skAI-castle-network:

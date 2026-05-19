@@ -131,4 +131,20 @@ public interface ReviewApi {
             @Valid @RequestBody ReviewCompleteRequest request,
             @AuthenticationPrincipal PrincipalDetails principal
     );
+
+    @Operation(summary = "Get a single review card (question text, no model answer)")
+    @GetMapping("/{questionId}")
+    ResponseEntity<ApiResponse<ReviewCardResponse>> getReviewCard(
+            @Parameter(description = "Evaluation question ID", example = "1")
+            @PathVariable Long questionId,
+            @AuthenticationPrincipal PrincipalDetails principal
+    );
+
+    @Operation(summary = "Get result of the most recent review attempt")
+    @GetMapping("/{questionId}/result")
+    ResponseEntity<ApiResponse<ReviewResultResponse>> getReviewResult(
+            @Parameter(description = "Evaluation question ID", example = "1")
+            @PathVariable Long questionId,
+            @AuthenticationPrincipal PrincipalDetails principal
+    );
 }

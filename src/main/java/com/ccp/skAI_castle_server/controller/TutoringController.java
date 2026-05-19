@@ -70,4 +70,12 @@ public class TutoringController implements TutoringApi {
         User user = studyTopicService.loadUser(principal.getUuid());
         return ApiResponse.Rest.success(ApiResultCode.SUCCESS, tutoringService.evaluate(sessionId, request, user));
     }
+
+    @Override
+    public ResponseEntity<ApiResponse<EvaluationResultResponse>> getEvaluationResult(
+            Long sessionId,
+            @AuthenticationPrincipal PrincipalDetails principal) {
+        User user = studyTopicService.loadUser(principal.getUuid());
+        return ApiResponse.Rest.success(ApiResultCode.SUCCESS, tutoringService.getEvaluationResult(sessionId, user));
+    }
 }

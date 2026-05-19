@@ -210,8 +210,8 @@ public class TutoringService {
             int qScore = scoringService.score(q.getQuestion(), answerItem.getUserAnswer(), q.getModelAnswer(), q.getKeywords());
             scores.add(qScore);
 
-            // Set user answer and initial SM-2 review schedule
-            q.submitAnswer(answerItem.getUserAnswer());
+            // Set user answer, per-question score, and initial SM-2 review schedule
+            q.submitAnswer(answerItem.getUserAnswer(), qScore);
             q.initReviewSchedule(LocalDate.now().plusDays(1));
 
             qTexts.add(q.getQuestion());
@@ -224,6 +224,7 @@ public class TutoringService {
                     .question(q.getQuestion())
                     .modelAnswer(q.getModelAnswer())
                     .userAnswer(answerItem.getUserAnswer())
+                    .score(qScore)
                     .nextReviewDate(LocalDate.now().plusDays(1))
                     .build());
         }
@@ -236,6 +237,41 @@ public class TutoringService {
                 .evaluationId(evaluation.getId())
                 .score(overallScore)
                 .feedback(feedback)
+                .questions(results)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public EvaluationResultResponse getEvaluationResult(Long sessionId, User user) {
+        ChatSession session = chatSessionRepository.findByIdAndUser(sessionId, user)
+                .orElseThrow(() -> new ApiException(SESSION_NOT_FOUND));
+
+        Evaluation evaluation = evaluationRepository.findByChatSession(session)
+                .orElseThrow(() -> new ApiException(EVALUATION_NOT_FOUND));
+
+        if (evaluation.getScore() == null) {
+            throw new ApiException(EVALUATION_NOT_FOUND);
+        }
+
+        List<EvaluationQuestion> questions = evaluationQuestionRepository
+                .findByEvaluationOrderByQuestionOrderAsc(evaluation);
+
+        List<EvaluationResultResponse.QuestionResult> results = questions.stream()
+                .map(q -> EvaluationResultResponse.QuestionResult.builder()
+                        .id(q.getId())
+                        .questionOrder(q.getQuestionOrder())
+                        .question(q.getQuestion())
+                        .modelAnswer(q.getModelAnswer())
+                        .userAnswer(q.getUserAnswer())
+                        .score(q.getEvaluationScore())
+                        .nextReviewDate(q.getNextReviewDate())
+                        .build())
+                .collect(Collectors.toList());
+
+        return EvaluationResultResponse.builder()
+                .evaluationId(evaluation.getId())
+                .score(evaluation.getScore())
+                .feedback(evaluation.getFeedback())
                 .questions(results)
                 .build();
     }

@@ -50,7 +50,7 @@ class StudyTopicControllerTest extends ControllerTestSupport {
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build();
         given(studyTopicService.createTopic("Machine Learning", mockUser)).willReturn(response);
 
-        mockMvc.perform(post("/api/topics")
+        mockMvc.perform(post("/topics")
                         .with(mockAuth())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -64,7 +64,7 @@ class StudyTopicControllerTest extends ControllerTestSupport {
 
     @Test
     void createTopic_unauthenticated_returns401() throws Exception {
-        mockMvc.perform(post("/api/topics")
+        mockMvc.perform(post("/topics")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -75,7 +75,7 @@ class StudyTopicControllerTest extends ControllerTestSupport {
 
     @Test
     void createTopic_blankTitle_returns400() throws Exception {
-        mockMvc.perform(post("/api/topics")
+        mockMvc.perform(post("/topics")
                         .with(mockAuth())
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -93,7 +93,7 @@ class StudyTopicControllerTest extends ControllerTestSupport {
                         .hasOutline(false).createdAt(LocalDateTime.now()).build()
         ));
 
-        mockMvc.perform(get("/api/topics").with(mockAuth()))
+        mockMvc.perform(get("/topics").with(mockAuth()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].title").value("ML"))
                 .andExpect(jsonPath("$.data[0].hasOutline").value(false));
@@ -106,7 +106,7 @@ class StudyTopicControllerTest extends ControllerTestSupport {
         ));
         given(studyTopicService.generateOutline(1L, mockUser)).willReturn(outline);
 
-        mockMvc.perform(post("/api/topics/1/outline")
+        mockMvc.perform(post("/topics/1/outline")
                         .with(mockAuth())
                         .with(csrf()))
                 .andExpect(status().isOk())
@@ -118,7 +118,7 @@ class StudyTopicControllerTest extends ControllerTestSupport {
         given(studyTopicService.generateOutline(99L, mockUser))
                 .willThrow(new ApiException(TOPIC_NOT_FOUND));
 
-        mockMvc.perform(post("/api/topics/99/outline")
+        mockMvc.perform(post("/topics/99/outline")
                         .with(mockAuth())
                         .with(csrf()))
                 .andExpect(status().isNotFound())
@@ -132,7 +132,7 @@ class StudyTopicControllerTest extends ControllerTestSupport {
                 .sessions(List.of()).build();
         given(studyTopicService.getTopicHistory(1L, mockUser)).willReturn(history);
 
-        mockMvc.perform(get("/api/topics/1/history").with(mockAuth()))
+        mockMvc.perform(get("/topics/1/history").with(mockAuth()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.topicId").value(1));
     }

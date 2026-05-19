@@ -46,6 +46,10 @@ public class EvaluationQuestion extends BaseTimeEntity {
 
     private Integer lastInterval; // SM-2 last interval in days
 
+    private Integer evaluationScore; // score from the initial recall evaluation
+
+    private Integer lastScore; // score of the most recent review attempt
+
     @Builder
     private EvaluationQuestion(Evaluation evaluation, Integer questionOrder, String question,
                                 String modelAnswer, String userAnswer, LocalDate nextReviewDate,
@@ -60,8 +64,9 @@ public class EvaluationQuestion extends BaseTimeEntity {
         this.keywords = keywords;
     }
 
-    public void submitAnswer(String userAnswer) {
+    public void submitAnswer(String userAnswer, int evaluationScore) {
         this.userAnswer = userAnswer;
+        this.evaluationScore = evaluationScore;
     }
 
     public void initReviewSchedule(LocalDate nextReviewDate) {
@@ -70,10 +75,11 @@ public class EvaluationQuestion extends BaseTimeEntity {
         this.lastInterval = 1;
     }
 
-    public void applySmResult(LocalDate nextReviewDate, int reviewCount, double ef, int lastInterval) {
+    public void applySmResult(LocalDate nextReviewDate, int reviewCount, double ef, int lastInterval, int score) {
         this.nextReviewDate = nextReviewDate;
         this.reviewCount = reviewCount;
         this.ef = ef;
         this.lastInterval = lastInterval;
+        this.lastScore = score;
     }
 }
