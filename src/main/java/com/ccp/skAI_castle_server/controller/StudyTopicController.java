@@ -58,4 +58,13 @@ public class StudyTopicController implements StudyTopicApi {
         User user = studyTopicService.loadUser(principal.getUuid());
         return ApiResponse.Rest.success(ApiResultCode.SUCCESS, studyTopicService.getTopicHistory(topicId, user));
     }
+
+    @Override
+    public ResponseEntity<ApiResponse<Void>> deleteTopic(
+            Long topicId,
+            @AuthenticationPrincipal PrincipalDetails principal) {
+        User user = studyTopicService.loadUser(principal.getUuid());
+        studyTopicService.deleteTopic(topicId, user);
+        return ApiResponse.Rest.success(ApiResultCode.SUCCESS, null);
+    }
 }

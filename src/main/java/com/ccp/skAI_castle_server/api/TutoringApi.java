@@ -19,7 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Tutoring", description = "AI tutoring sessions: start, chat, finish, and recall evaluation")
-@RequestMapping("/api/sessions")
+@RequestMapping("/sessions")
 @SecurityRequirement(name = "BearerAuth")
 public interface TutoringApi {
 

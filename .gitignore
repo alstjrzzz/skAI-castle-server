@@ -7,8 +7,8 @@ bin/
 
 ### Sensitive Data ###
 .env
-.env.*
-!.env.example
+.env
+!.env
 schema.sql
 data.sql
 src/main/resources/application-local.yml

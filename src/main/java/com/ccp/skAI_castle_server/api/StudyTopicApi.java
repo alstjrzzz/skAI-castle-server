@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @Tag(name = "Study Topic", description = "Study topic management and AI outline generation")
-@RequestMapping("/api/topics")
+@RequestMapping("/topics")
 @SecurityRequirement(name = "BearerAuth")
 public interface StudyTopicApi {
 
@@ -289,6 +289,13 @@ public interface StudyTopicApi {
     })
     @GetMapping("/{topicId}/history")
     ResponseEntity<ApiResponse<TopicHistoryResponse>> getTopicHistory(
+            @Parameter(description = "Study topic ID", example = "1") @PathVariable Long topicId,
+            @AuthenticationPrincipal PrincipalDetails principal
+    );
+
+    @Operation(summary = "Delete study topic", description = "Deletes a topic and all associated sessions, evaluations, and questions.")
+    @DeleteMapping("/{topicId}")
+    ResponseEntity<ApiResponse<Void>> deleteTopic(
             @Parameter(description = "Study topic ID", example = "1") @PathVariable Long topicId,
             @AuthenticationPrincipal PrincipalDetails principal
     );

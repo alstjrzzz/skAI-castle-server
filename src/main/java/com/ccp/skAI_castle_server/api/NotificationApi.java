@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @Tag(name = "Notification", description = "User notifications for review reminders")
-@RequestMapping("/api/notifications")
+@RequestMapping("/notifications")
 @SecurityRequirement(name = "BearerAuth")
 public interface NotificationApi {
 

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @Tag(name = "Review", description = "Spaced-repetition review cards and SM-2 scheduling")
-@RequestMapping("/api/reviews")
+@RequestMapping("/reviews")
 @SecurityRequirement(name = "BearerAuth")
 public interface ReviewApi {
 
