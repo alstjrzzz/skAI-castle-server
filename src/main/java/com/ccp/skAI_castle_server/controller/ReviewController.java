@@ -40,4 +40,22 @@ public class ReviewController implements ReviewApi {
         return ApiResponse.Rest.success(ApiResultCode.SUCCESS,
                 reviewService.completeReview(questionId, request.getAnswer(), user));
     }
+
+    @Override
+    public ResponseEntity<ApiResponse<ReviewCardResponse>> getReviewCard(
+            Long questionId,
+            @AuthenticationPrincipal PrincipalDetails principal) {
+        User user = studyTopicService.loadUser(principal.getUuid());
+        return ApiResponse.Rest.success(ApiResultCode.SUCCESS,
+                reviewService.getReviewCard(questionId, user));
+    }
+
+    @Override
+    public ResponseEntity<ApiResponse<ReviewResultResponse>> getReviewResult(
+            Long questionId,
+            @AuthenticationPrincipal PrincipalDetails principal) {
+        User user = studyTopicService.loadUser(principal.getUuid());
+        return ApiResponse.Rest.success(ApiResultCode.SUCCESS,
+                reviewService.getReviewResult(questionId, user));
+    }
 }

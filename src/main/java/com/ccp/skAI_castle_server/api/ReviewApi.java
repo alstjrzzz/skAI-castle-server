@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @Tag(name = "Review", description = "Spaced-repetition review cards and SM-2 scheduling")
-@RequestMapping("/api/reviews")
+@RequestMapping("/reviews")
 @SecurityRequirement(name = "BearerAuth")
 public interface ReviewApi {
 
@@ -129,6 +129,22 @@ public interface ReviewApi {
             @Parameter(description = "Evaluation question ID (review card identifier)", example = "1")
             @PathVariable Long questionId,
             @Valid @RequestBody ReviewCompleteRequest request,
+            @AuthenticationPrincipal PrincipalDetails principal
+    );
+
+    @Operation(summary = "Get a single review card (question text, no model answer)")
+    @GetMapping("/{questionId}")
+    ResponseEntity<ApiResponse<ReviewCardResponse>> getReviewCard(
+            @Parameter(description = "Evaluation question ID", example = "1")
+            @PathVariable Long questionId,
+            @AuthenticationPrincipal PrincipalDetails principal
+    );
+
+    @Operation(summary = "Get result of the most recent review attempt")
+    @GetMapping("/{questionId}/result")
+    ResponseEntity<ApiResponse<ReviewResultResponse>> getReviewResult(
+            @Parameter(description = "Evaluation question ID", example = "1")
+            @PathVariable Long questionId,
             @AuthenticationPrincipal PrincipalDetails principal
     );
 }

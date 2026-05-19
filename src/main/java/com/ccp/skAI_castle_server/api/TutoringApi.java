@@ -19,7 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Tutoring", description = "AI tutoring sessions: start, chat, finish, and recall evaluation")
-@RequestMapping("/api/sessions")
+@RequestMapping("/sessions")
 @SecurityRequirement(name = "BearerAuth")
 public interface TutoringApi {
 
@@ -418,6 +418,16 @@ public interface TutoringApi {
     ResponseEntity<ApiResponse<EvaluationResultResponse>> evaluate(
             @Parameter(description = "Chat session ID", example = "1") @PathVariable Long sessionId,
             @Valid @RequestBody EvaluateRequest request,
+            @AuthenticationPrincipal PrincipalDetails principal
+    );
+
+    @Operation(
+            summary = "Get completed evaluation result",
+            description = "Returns the full evaluation result (score, feedback, questions with model answers) for an already-submitted evaluation."
+    )
+    @GetMapping("/{sessionId}/result")
+    ResponseEntity<ApiResponse<EvaluationResultResponse>> getEvaluationResult(
+            @Parameter(description = "Chat session ID", example = "1") @PathVariable Long sessionId,
             @AuthenticationPrincipal PrincipalDetails principal
     );
 }

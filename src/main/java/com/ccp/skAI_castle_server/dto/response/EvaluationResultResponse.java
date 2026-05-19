@@ -47,6 +47,9 @@ public class EvaluationResultResponse {
         @Schema(description = "User's submitted answer", example = "Supervised learning uses labeled examples to train a model.")
         private String userAnswer;
 
+        @Schema(description = "Score for this question (0–100)", example = "80")
+        private Integer score;
+
         @Schema(description = "Next scheduled review date (SM-2 first interval applied)", example = "2024-01-06")
         private LocalDate nextReviewDate;
     }

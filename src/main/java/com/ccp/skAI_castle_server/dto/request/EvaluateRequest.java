@@ -26,7 +26,7 @@ public class EvaluateRequest {
         @Schema(description = "Evaluation question ID", example = "1")
         private Long questionId;
 
-        @NotBlank
+        @NotNull
         @Schema(description = "User's free-form answer", example = "Supervised learning is a type of ML where the model learns from labeled training data.")
         private String userAnswer;
     }

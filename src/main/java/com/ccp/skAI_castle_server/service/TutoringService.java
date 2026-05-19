@@ -121,12 +121,11 @@ public class TutoringService {
         List<LlmService.QuestionData> questionDataList = llmService.generateQuestions(outlineJson, history);
 
         // Create Evaluation record (score not yet set)
-        Evaluation evaluation = Evaluation.builder()
+        Evaluation evaluation = evaluationRepository.save(Evaluation.builder()
                 .user(user)
                 .studyTopic(session.getStudyTopic())
                 .chatSession(session)
-                .build();
-        evaluationRepository.save(evaluation);
+                .build());
 
         // Save generated questions (model answers stored, not exposed to user yet)
         List<FinishSessionResponse.QuestionItem> questionItems = new ArrayList<>();
@@ -134,14 +133,13 @@ public class TutoringService {
             LlmService.QuestionData qd = questionDataList.get(i);
             String keywordsJson = serializeKeywords(qd.keywords());
 
-            EvaluationQuestion question = EvaluationQuestion.builder()
+            EvaluationQuestion question = evaluationQuestionRepository.save(EvaluationQuestion.builder()
                     .evaluation(evaluation)
                     .questionOrder(i + 1)
                     .question(qd.question())
                     .modelAnswer(qd.modelAnswer())
                     .keywords(keywordsJson)
-                    .build();
-            evaluationQuestionRepository.save(question);
+                    .build());
 
             questionItems.add(FinishSessionResponse.QuestionItem.builder()
                     .id(question.getId())
@@ -209,11 +207,11 @@ public class TutoringService {
             EvaluationQuestion q = questionMap.get(answerItem.getQuestionId());
             if (q == null) throw new ApiException(QUESTION_NOT_FOUND);
 
-            int qScore = scoringService.score(answerItem.getUserAnswer(), q.getModelAnswer(), q.getKeywords());
+            int qScore = scoringService.score(q.getQuestion(), answerItem.getUserAnswer(), q.getModelAnswer(), q.getKeywords());
             scores.add(qScore);
 
-            // Set user answer and initial SM-2 review schedule
-            q.submitAnswer(answerItem.getUserAnswer());
+            // Set user answer, per-question score, and initial SM-2 review schedule
+            q.submitAnswer(answerItem.getUserAnswer(), qScore);
             q.initReviewSchedule(LocalDate.now().plusDays(1));
 
             qTexts.add(q.getQuestion());
@@ -226,6 +224,7 @@ public class TutoringService {
                     .question(q.getQuestion())
                     .modelAnswer(q.getModelAnswer())
                     .userAnswer(answerItem.getUserAnswer())
+                    .score(qScore)
                     .nextReviewDate(LocalDate.now().plusDays(1))
                     .build());
         }
@@ -238,6 +237,41 @@ public class TutoringService {
                 .evaluationId(evaluation.getId())
                 .score(overallScore)
                 .feedback(feedback)
+                .questions(results)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public EvaluationResultResponse getEvaluationResult(Long sessionId, User user) {
+        ChatSession session = chatSessionRepository.findByIdAndUser(sessionId, user)
+                .orElseThrow(() -> new ApiException(SESSION_NOT_FOUND));
+
+        Evaluation evaluation = evaluationRepository.findByChatSession(session)
+                .orElseThrow(() -> new ApiException(EVALUATION_NOT_FOUND));
+
+        if (evaluation.getScore() == null) {
+            throw new ApiException(EVALUATION_NOT_FOUND);
+        }
+
+        List<EvaluationQuestion> questions = evaluationQuestionRepository
+                .findByEvaluationOrderByQuestionOrderAsc(evaluation);
+
+        List<EvaluationResultResponse.QuestionResult> results = questions.stream()
+                .map(q -> EvaluationResultResponse.QuestionResult.builder()
+                        .id(q.getId())
+                        .questionOrder(q.getQuestionOrder())
+                        .question(q.getQuestion())
+                        .modelAnswer(q.getModelAnswer())
+                        .userAnswer(q.getUserAnswer())
+                        .score(q.getEvaluationScore())
+                        .nextReviewDate(q.getNextReviewDate())
+                        .build())
+                .collect(Collectors.toList());
+
+        return EvaluationResultResponse.builder()
+                .evaluationId(evaluation.getId())
+                .score(evaluation.getScore())
+                .feedback(evaluation.getFeedback())
                 .questions(results)
                 .build();
     }

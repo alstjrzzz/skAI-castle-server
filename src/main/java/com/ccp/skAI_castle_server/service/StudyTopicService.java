@@ -27,6 +27,7 @@ public class StudyTopicService {
 
     private final StudyTopicRepository studyTopicRepository;
     private final ChatSessionRepository chatSessionRepository;
+    private final ChatMessageRepository chatMessageRepository;
     private final EvaluationRepository evaluationRepository;
     private final EvaluationQuestionRepository evaluationQuestionRepository;
     private final UserRepository userRepository;
@@ -125,6 +126,21 @@ public class StudyTopicService {
                 .outline(parseOutline(topic.getOutline()))
                 .sessions(sessionItems)
                 .build();
+    }
+
+    @Transactional
+    public void deleteTopic(Long topicId, User user) {
+        StudyTopic topic = studyTopicRepository.findByIdAndUser(topicId, user)
+                .orElseThrow(() -> new ApiException(TOPIC_NOT_FOUND));
+
+        List<ChatSession> sessions = chatSessionRepository.findByStudyTopicOrderByCreatedAtAsc(topic);
+        List<Evaluation> evaluations = evaluationRepository.findByStudyTopicOrderByCreatedAtAsc(topic);
+
+        evaluations.forEach(e -> evaluationQuestionRepository.deleteAll(evaluationQuestionRepository.findByEvaluationOrderByQuestionOrderAsc(e)));
+        evaluationRepository.deleteAll(evaluations);
+        sessions.forEach(s -> chatMessageRepository.deleteAll(chatMessageRepository.findBySessionOrderByTurnNumberAscIdAsc(s)));
+        chatSessionRepository.deleteAll(sessions);
+        studyTopicRepository.delete(topic);
     }
 
     public User loadUser(String uuid) {

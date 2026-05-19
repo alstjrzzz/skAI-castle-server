@@ -7,14 +7,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: skAI-castle
-      POSTGRES_USER: ${DATASOURCE_USERNAME}
-      POSTGRES_PASSWORD: ${DATASOURCE_PASSWORD}
+      POSTGRES_USER: ${DATASOURCE_USERNAME:-skAI-castle}
+      POSTGRES_PASSWORD: ${DATASOURCE_PASSWORD:-skAI-castle}
     labels:
       - "org.springframework.boot.ignore=true"
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
     networks:
       - skAI-castle-network
     healthcheck:
@@ -23,6 +23,22 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  ai-server:
+    build:
+      context: ../skai-ai-server
+    container_name: skai-ai-server
+    labels:
+      - "org.springframework.boot.ignore=true"
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: ../skai-ai-server/.env
+        required: false
+    restart: unless-stopped
+    networks:
+      - skAI-castle-network
+
 
 networks:
   skAI-castle-network:
