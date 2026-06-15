@@ -38,7 +38,7 @@ public class ReviewController implements ReviewApi {
             @AuthenticationPrincipal PrincipalDetails principal) {
         User user = studyTopicService.loadUser(principal.getUuid());
         return ApiResponse.Rest.success(ApiResultCode.SUCCESS,
-                reviewService.completeReview(questionId, request.getAnswer(), user));
+                reviewService.completeReview(questionId, request, user));
     }
 
     @Override

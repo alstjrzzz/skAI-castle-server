@@ -2,6 +2,7 @@ package com.ccp.skAI_castle_server.service;
 
 import com.ccp.skAI_castle_server.domain.ChatMessageRole;
 import com.ccp.skAI_castle_server.domain.ChatSessionStatus;
+import com.ccp.skAI_castle_server.domain.QuestionType;
 import com.ccp.skAI_castle_server.domain.UserRole;
 import com.ccp.skAI_castle_server.domain.entity.*;
 import com.ccp.skAI_castle_server.dto.request.EvaluateRequest;
@@ -111,15 +112,18 @@ class TutoringServiceTest {
     }
 
     @Test
-    void finishSession_success_createsEvaluationAndQuestions() {
+    void finishSession_success_createsEvaluationAndRecallQuestions() {
         ChatSession session = ChatSession.builder().user(testUser).studyTopic(testTopic).build();
         ReflectionTestUtils.setField(session, "id", 10L);
 
+        // Return 4 WRITTEN questions so all become recall questions (recallCount = min(4, 4) = 4)
         given(chatSessionRepository.findByIdAndUser(10L, testUser)).willReturn(Optional.of(session));
         given(chatMessageRepository.findBySessionOrderByTurnNumberAscIdAsc(session)).willReturn(List.of());
         given(llmService.generateQuestions(any(), anyList())).willReturn(List.of(
-                new LlmService.QuestionData("Q1?", "Model A1", List.of("key1")),
-                new LlmService.QuestionData("Q2?", "Model A2", List.of("key2"))
+                new LlmService.QuestionData("Q1?", "Model A1", List.of("key1"), QuestionType.WRITTEN, null),
+                new LlmService.QuestionData("Q2?", "Model A2", List.of("key2"), QuestionType.WRITTEN, null),
+                new LlmService.QuestionData("Q3?", "Model A3", List.of("key3"), QuestionType.WRITTEN, null),
+                new LlmService.QuestionData("Q4?", "Model A4", List.of("key4"), QuestionType.WRITTEN, null)
         ));
         Evaluation savedEval = Evaluation.builder()
                 .user(testUser).studyTopic(testTopic).chatSession(session).build();
@@ -128,19 +132,27 @@ class TutoringServiceTest {
 
         EvaluationQuestion q1 = EvaluationQuestion.builder()
                 .evaluation(savedEval).questionOrder(1).question("Q1?")
-                .modelAnswer("A1").keywords("[\"key1\"]").build();
+                .modelAnswer("A1").keywords("[\"key1\"]").isRecallQuestion(true).build();
         EvaluationQuestion q2 = EvaluationQuestion.builder()
                 .evaluation(savedEval).questionOrder(2).question("Q2?")
-                .modelAnswer("A2").keywords("[\"key2\"]").build();
+                .modelAnswer("A2").keywords("[\"key2\"]").isRecallQuestion(true).build();
+        EvaluationQuestion q3 = EvaluationQuestion.builder()
+                .evaluation(savedEval).questionOrder(3).question("Q3?")
+                .modelAnswer("A3").keywords("[\"key3\"]").isRecallQuestion(true).build();
+        EvaluationQuestion q4 = EvaluationQuestion.builder()
+                .evaluation(savedEval).questionOrder(4).question("Q4?")
+                .modelAnswer("A4").keywords("[\"key4\"]").isRecallQuestion(true).build();
         ReflectionTestUtils.setField(q1, "id", 1L);
         ReflectionTestUtils.setField(q2, "id", 2L);
-        given(evaluationQuestionRepository.save(any(EvaluationQuestion.class))).willReturn(q1, q2);
+        ReflectionTestUtils.setField(q3, "id", 3L);
+        ReflectionTestUtils.setField(q4, "id", 4L);
+        given(evaluationQuestionRepository.save(any(EvaluationQuestion.class))).willReturn(q1, q2, q3, q4);
 
         FinishSessionResponse response = tutoringService.finishSession(10L, testUser);
 
         assertThat(response.getEvaluationId()).isEqualTo(5L);
-        assertThat(response.getQuestions()).hasSize(2);
-        assertThat(response.getQuestions().get(0).getQuestion()).isEqualTo("Q1?");
+        // All 4 questions are recall (pool size = 4, recall count = min(4,4) = 4)
+        assertThat(response.getQuestions()).hasSize(4);
     }
 
     @Test
@@ -173,7 +185,7 @@ class TutoringServiceTest {
     }
 
     @Test
-    void getEvaluationResult_success_returnsScoreAndQuestions() {
+    void getEvaluationResult_success_returnsScoreAndRecallQuestions() {
         ChatSession session = ChatSession.builder().user(testUser).studyTopic(testTopic).build();
         ReflectionTestUtils.setField(session, "id", 10L);
 
@@ -181,15 +193,22 @@ class TutoringServiceTest {
                 .user(testUser).studyTopic(testTopic).chatSession(session).build();
         scored.updateResult(78, "피드백 내용");
 
+        // Recall question
         EvaluationQuestion q = EvaluationQuestion.builder()
                 .evaluation(scored).questionOrder(1).question("Q1?")
-                .modelAnswer("Model A1").keywords("[\"key1\"]").build();
+                .modelAnswer("Model A1").keywords("[\"key1\"]").isRecallQuestion(true).build();
         ReflectionTestUtils.setField(q, "id", 1L);
+
+        // Non-recall question (should be filtered out)
+        EvaluationQuestion qNonRecall = EvaluationQuestion.builder()
+                .evaluation(scored).questionOrder(2).question("Q2?")
+                .modelAnswer("Model A2").keywords("[\"key2\"]").isRecallQuestion(false).build();
+        ReflectionTestUtils.setField(qNonRecall, "id", 2L);
 
         given(chatSessionRepository.findByIdAndUser(10L, testUser)).willReturn(Optional.of(session));
         given(evaluationRepository.findByChatSession(session)).willReturn(Optional.of(scored));
         given(evaluationQuestionRepository.findByEvaluationOrderByQuestionOrderAsc(scored))
-                .willReturn(List.of(q));
+                .willReturn(List.of(q, qNonRecall));
 
         var result = tutoringService.getEvaluationResult(10L, testUser);
 

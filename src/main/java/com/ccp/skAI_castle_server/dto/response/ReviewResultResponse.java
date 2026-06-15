@@ -1,11 +1,13 @@
 package com.ccp.skAI_castle_server.dto.response;
 
+import com.ccp.skAI_castle_server.domain.QuestionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Builder
@@ -16,8 +18,14 @@ public class ReviewResultResponse {
     @Schema(description = "Score for this review attempt (0–100)", example = "85")
     private int score;
 
+    @Schema(description = "Question type: WRITTEN or MULTIPLE_CHOICE", example = "WRITTEN")
+    private QuestionType questionType;
+
     @Schema(description = "Model answer revealed after submitting the review", example = "Supervised learning is a paradigm where a model is trained on labeled data...")
     private String modelAnswer;
+
+    @Schema(description = "Answer choices with isCorrect revealed. Null for WRITTEN.")
+    private List<ChoiceItem> choices;
 
     @Schema(description = "Next review date calculated by the SM-2 algorithm. Null if the user chose to stop reviewing this card.", example = "2024-01-12")
     private LocalDate nextReviewDate;

@@ -2,11 +2,13 @@ package com.ccp.skAI_castle_server.service;
 
 import com.ccp.skAI_castle_server.domain.ChatMessageRole;
 import com.ccp.skAI_castle_server.domain.ChatSessionStatus;
+import com.ccp.skAI_castle_server.domain.QuestionType;
 import com.ccp.skAI_castle_server.domain.entity.*;
 import com.ccp.skAI_castle_server.dto.request.EvaluateRequest;
 import com.ccp.skAI_castle_server.dto.response.*;
 import com.ccp.skAI_castle_server.exception.ApiException;
 import com.ccp.skAI_castle_server.repository.*;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,10 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.ccp.skAI_castle_server.dto.response.ApiResultCode.*;
 
@@ -67,11 +68,9 @@ public class TutoringService {
             throw new ApiException(SESSION_NOT_ACTIVE);
         }
 
-        // Compute turn number
         long userMsgCount = chatMessageRepository.countBySessionAndRole(session, ChatMessageRole.USER);
         int turnNumber = (int) userMsgCount + 1;
 
-        // Save user message
         ChatMessage userMsg = ChatMessage.builder()
                 .session(session)
                 .role(ChatMessageRole.USER)
@@ -80,14 +79,12 @@ public class TutoringService {
                 .build();
         chatMessageRepository.save(userMsg);
 
-        // Load full history (including new user message) and call LLM
         List<ChatMessage> history = chatMessageRepository.findBySessionOrderByTurnNumberAscIdAsc(session);
         String topicTitle = session.getStudyTopic().getTitle();
         String outlineJson = session.getStudyTopic().getOutline();
 
         String aiResponse = llmService.tutorChat(topicTitle, outlineJson, history);
 
-        // Save AI response
         ChatMessage aiMsg = ChatMessage.builder()
                 .session(session)
                 .role(ChatMessageRole.ASSISTANT)
@@ -111,46 +108,65 @@ public class TutoringService {
             throw new ApiException(SESSION_NOT_ACTIVE);
         }
 
-        // Close session
         session.close();
 
-        // Load chat history and generate questions
         List<ChatMessage> history = chatMessageRepository.findBySessionOrderByTurnNumberAscIdAsc(session);
         String outlineJson = session.getStudyTopic().getOutline();
 
+        // Generate pool of 10 questions (mix of WRITTEN + MULTIPLE_CHOICE)
         List<LlmService.QuestionData> questionDataList = llmService.generateQuestions(outlineJson, history);
 
-        // Create Evaluation record (score not yet set)
+        // Randomly select 4 questions as recall (shown immediately); rest enter review queue directly
+        List<Integer> indices = IntStream.range(0, questionDataList.size()).boxed().collect(Collectors.toList());
+        Collections.shuffle(indices);
+        int recallCount = Math.min(4, questionDataList.size());
+        Set<Integer> recallIndices = new HashSet<>(indices.subList(0, recallCount));
+
         Evaluation evaluation = evaluationRepository.save(Evaluation.builder()
                 .user(user)
                 .studyTopic(session.getStudyTopic())
                 .chatSession(session)
                 .build());
 
-        // Save generated questions (model answers stored, not exposed to user yet)
-        List<FinishSessionResponse.QuestionItem> questionItems = new ArrayList<>();
+        List<FinishSessionResponse.QuestionItem> recallItems = new ArrayList<>();
+        int recallOrder = 0;
+
         for (int i = 0; i < questionDataList.size(); i++) {
             LlmService.QuestionData qd = questionDataList.get(i);
+            boolean isRecall = recallIndices.contains(i);
             String keywordsJson = serializeKeywords(qd.keywords());
 
-            EvaluationQuestion question = evaluationQuestionRepository.save(EvaluationQuestion.builder()
+            EvaluationQuestion saved = evaluationQuestionRepository.save(EvaluationQuestion.builder()
                     .evaluation(evaluation)
                     .questionOrder(i + 1)
                     .question(qd.question())
                     .modelAnswer(qd.modelAnswer())
                     .keywords(keywordsJson)
+                    .questionType(qd.questionType())
+                    .choices(qd.choicesJson())
+                    .isRecallQuestion(isRecall)
                     .build());
 
-            questionItems.add(FinishSessionResponse.QuestionItem.builder()
-                    .id(question.getId())
-                    .questionOrder(i + 1)
-                    .question(qd.question())
-                    .build());
+            if (!isRecall) {
+                // Non-recall questions skip the evaluation step and go straight to the review queue
+                saved.initReviewSchedule(LocalDate.now().plusDays(1));
+            }
+
+            if (isRecall) {
+                recallOrder++;
+                recallItems.add(FinishSessionResponse.QuestionItem.builder()
+                        .id(saved.getId())
+                        .questionOrder(recallOrder)
+                        .question(qd.question())
+                        .questionType(qd.questionType())
+                        .choices(parseChoices(qd.choicesJson(), false))
+                        .build());
+            }
         }
 
         return FinishSessionResponse.builder()
                 .evaluationId(evaluation.getId())
-                .questions(questionItems)
+                .questions(recallItems)
                 .build();
     }
 
@@ -162,16 +178,23 @@ public class TutoringService {
         Evaluation evaluation = evaluationRepository.findByChatSession(session)
                 .orElseThrow(() -> new ApiException(EVALUATION_NOT_FOUND));
 
-        List<EvaluationQuestion> questions = evaluationQuestionRepository
-                .findByEvaluationOrderByQuestionOrderAsc(evaluation);
-
-        List<FinishSessionResponse.QuestionItem> items = questions.stream()
-                .map(q -> FinishSessionResponse.QuestionItem.builder()
-                        .id(q.getId())
-                        .questionOrder(q.getQuestionOrder())
-                        .question(q.getQuestion())
-                        .build())
+        List<EvaluationQuestion> recallQuestions = evaluationQuestionRepository
+                .findByEvaluationOrderByQuestionOrderAsc(evaluation)
+                .stream()
+                .filter(EvaluationQuestion::isRecall)
                 .collect(Collectors.toList());
+
+        List<FinishSessionResponse.QuestionItem> items = new ArrayList<>();
+        for (int i = 0; i < recallQuestions.size(); i++) {
+            EvaluationQuestion q = recallQuestions.get(i);
+            items.add(FinishSessionResponse.QuestionItem.builder()
+                    .id(q.getId())
+                    .questionOrder(i + 1)
+                    .question(q.getQuestion())
+                    .questionType(q.getQuestionType())
+                    .choices(parseChoices(q.getChoices(), false))
+                    .build());
+        }
 
         return FinishSessionResponse.builder()
                 .evaluationId(evaluation.getId())
@@ -203,29 +226,42 @@ public class TutoringService {
         List<String> modelAnswers = new ArrayList<>();
         List<String> userAnswers = new ArrayList<>();
 
+        int displayOrder = 0;
         for (EvaluateRequest.UserAnswerItem answerItem : request.getAnswers()) {
             EvaluationQuestion q = questionMap.get(answerItem.getQuestionId());
             if (q == null) throw new ApiException(QUESTION_NOT_FOUND);
 
-            int qScore = scoringService.score(q.getQuestion(), answerItem.getUserAnswer(), q.getModelAnswer(), q.getKeywords());
-            scores.add(qScore);
+            int qScore;
+            String answeredText;
 
-            // Set user answer, per-question score, and initial SM-2 review schedule
-            q.submitAnswer(answerItem.getUserAnswer(), qScore);
+            if (q.getQuestionType() == QuestionType.MULTIPLE_CHOICE) {
+                String correctLabel = findCorrectLabel(q.getChoices());
+                qScore = correctLabel.equals(answerItem.getSelectedChoice()) ? 100 : 0;
+                answeredText = answerItem.getSelectedChoice();
+            } else {
+                qScore = scoringService.score(q.getQuestion(), answerItem.getUserAnswer(), q.getModelAnswer(), q.getKeywords());
+                answeredText = answerItem.getUserAnswer();
+            }
+
+            scores.add(qScore);
+            q.submitAnswer(answeredText, qScore);
             q.initReviewSchedule(LocalDate.now().plusDays(1));
 
             qTexts.add(q.getQuestion());
             modelAnswers.add(q.getModelAnswer());
-            userAnswers.add(answerItem.getUserAnswer());
+            userAnswers.add(answeredText != null ? answeredText : "");
 
+            displayOrder++;
             results.add(EvaluationResultResponse.QuestionResult.builder()
                     .id(q.getId())
-                    .questionOrder(q.getQuestionOrder())
+                    .questionOrder(displayOrder)
                     .question(q.getQuestion())
+                    .questionType(q.getQuestionType())
                     .modelAnswer(q.getModelAnswer())
-                    .userAnswer(answerItem.getUserAnswer())
+                    .userAnswer(answeredText)
                     .score(qScore)
                     .nextReviewDate(LocalDate.now().plusDays(1))
+                    .choices(parseChoices(q.getChoices(), true))
                     .build());
         }
 
@@ -253,20 +289,27 @@ public class TutoringService {
             throw new ApiException(EVALUATION_NOT_FOUND);
         }
 
-        List<EvaluationQuestion> questions = evaluationQuestionRepository
-                .findByEvaluationOrderByQuestionOrderAsc(evaluation);
-
-        List<EvaluationResultResponse.QuestionResult> results = questions.stream()
-                .map(q -> EvaluationResultResponse.QuestionResult.builder()
-                        .id(q.getId())
-                        .questionOrder(q.getQuestionOrder())
-                        .question(q.getQuestion())
-                        .modelAnswer(q.getModelAnswer())
-                        .userAnswer(q.getUserAnswer())
-                        .score(q.getEvaluationScore())
-                        .nextReviewDate(q.getNextReviewDate())
-                        .build())
+        List<EvaluationQuestion> recallQuestions = evaluationQuestionRepository
+                .findByEvaluationOrderByQuestionOrderAsc(evaluation)
+                .stream()
+                .filter(EvaluationQuestion::isRecall)
                 .collect(Collectors.toList());
+
+        List<EvaluationResultResponse.QuestionResult> results = new ArrayList<>();
+        for (int i = 0; i < recallQuestions.size(); i++) {
+            EvaluationQuestion q = recallQuestions.get(i);
+            results.add(EvaluationResultResponse.QuestionResult.builder()
+                    .id(q.getId())
+                    .questionOrder(i + 1)
+                    .question(q.getQuestion())
+                    .questionType(q.getQuestionType())
+                    .modelAnswer(q.getModelAnswer())
+                    .userAnswer(q.getUserAnswer())
+                    .score(q.getEvaluationScore())
+                    .nextReviewDate(q.getNextReviewDate())
+                    .choices(parseChoices(q.getChoices(), true))
+                    .build());
+        }
 
         return EvaluationResultResponse.builder()
                 .evaluationId(evaluation.getId())
@@ -303,5 +346,40 @@ public class TutoringService {
         } catch (Exception e) {
             return "[]";
         }
+    }
+
+    List<ChoiceItem> parseChoices(String choicesJson, boolean revealCorrect) {
+        if (choicesJson == null) return null;
+        try {
+            JsonNode arr = objectMapper.readTree(choicesJson);
+            List<ChoiceItem> list = new ArrayList<>();
+            for (JsonNode n : arr) {
+                Boolean isCorrect = revealCorrect ? n.path("isCorrect").asBoolean() : null;
+                list.add(ChoiceItem.builder()
+                        .label(n.path("label").asText())
+                        .text(n.path("text").asText())
+                        .isCorrect(isCorrect)
+                        .build());
+            }
+            return list;
+        } catch (Exception e) {
+            log.warn("Failed to parse choices JSON", e);
+            return null;
+        }
+    }
+
+    private String findCorrectLabel(String choicesJson) {
+        if (choicesJson == null) return "";
+        try {
+            JsonNode arr = objectMapper.readTree(choicesJson);
+            for (JsonNode n : arr) {
+                if (n.path("isCorrect").asBoolean()) {
+                    return n.path("label").asText();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to find correct label in choices JSON", e);
+        }
+        return "";
     }
 }

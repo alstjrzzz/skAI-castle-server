@@ -1,5 +1,6 @@
 package com.ccp.skAI_castle_server.dto.response;
 
+import com.ccp.skAI_castle_server.domain.QuestionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -41,10 +42,13 @@ public class EvaluationResultResponse {
         @Schema(description = "Question text", example = "Explain what supervised learning is.")
         private String question;
 
+        @Schema(description = "Question type: WRITTEN or MULTIPLE_CHOICE", example = "WRITTEN")
+        private QuestionType questionType;
+
         @Schema(description = "Model answer revealed after evaluation", example = "Supervised learning is a paradigm where a model is trained on labeled data...")
         private String modelAnswer;
 
-        @Schema(description = "User's submitted answer", example = "Supervised learning uses labeled examples to train a model.")
+        @Schema(description = "User's submitted answer or selected choice label", example = "Supervised learning uses labeled examples to train a model.")
         private String userAnswer;
 
         @Schema(description = "Score for this question (0–100)", example = "80")
@@ -52,5 +56,8 @@ public class EvaluationResultResponse {
 
         @Schema(description = "Next scheduled review date (SM-2 first interval applied)", example = "2024-01-06")
         private LocalDate nextReviewDate;
+
+        @Schema(description = "Answer choices with isCorrect revealed. Null for WRITTEN.")
+        private List<ChoiceItem> choices;
     }
 }

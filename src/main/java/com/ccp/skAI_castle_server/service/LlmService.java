@@ -1,5 +1,6 @@
 package com.ccp.skAI_castle_server.service;
 
+import com.ccp.skAI_castle_server.domain.QuestionType;
 import com.ccp.skAI_castle_server.domain.entity.ChatMessage;
 import com.ccp.skAI_castle_server.dto.response.OutlineDto;
 import com.ccp.skAI_castle_server.exception.ApiException;
@@ -24,7 +25,13 @@ public class LlmService {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
-    public record QuestionData(String question, String modelAnswer, List<String> keywords) {}
+    public record QuestionData(
+            String question,
+            String modelAnswer,
+            List<String> keywords,
+            QuestionType questionType,
+            String choicesJson
+    ) {}
 
     public LlmService(
             @Qualifier("aiServerRestClient") RestClient restClient,
@@ -104,21 +111,30 @@ public class LlmService {
             historyStr.append(msg.getRole().name()).append(": ").append(msg.getContent()).append("\n");
         }
 
+        String systemPrompt =
+                "당신은 교육 평가 전문가입니다. 튜터링 세션을 기반으로 역설명(recall) 질문을 생성하세요. " +
+                "서술형(WRITTEN)과 객관식(MULTIPLE_CHOICE) 두 가지 유형의 질문을 생성하세요. " +
+                "모든 질문, 답변, 키워드는 반드시 한국어로 작성하세요. " +
+                "아래 JSON 형식만 반환하세요: " +
+                "{\"questions\": [" +
+                "{\"type\": \"WRITTEN\", \"question\": \"질문\", \"modelAnswer\": \"모범 답안\", \"keywords\": [\"키워드1\"]}," +
+                "{\"type\": \"MULTIPLE_CHOICE\", \"question\": \"질문\", \"modelAnswer\": \"정답 설명\", \"keywords\": [], " +
+                "\"choices\": [{\"label\": \"A\", \"text\": \"선지\", \"isCorrect\": true}, {\"label\": \"B\", \"text\": \"선지\", \"isCorrect\": false}, " +
+                "{\"label\": \"C\", \"text\": \"선지\", \"isCorrect\": false}, {\"label\": \"D\", \"text\": \"선지\", \"isCorrect\": false}]}" +
+                "]}";
+
+        String userPrompt =
+                "학습 목차: " + outlineJson + "\n\n" +
+                "대화 기록:\n" + historyStr + "\n\n" +
+                "위 대화에서 다룬 핵심 개념을 확인할 수 있는 질문 10개를 한국어로 생성하세요. " +
+                "서술형(WRITTEN) 5~6개, 객관식(MULTIPLE_CHOICE) 4~5개로 구성하세요. " +
+                "서술형: '왜?', '어떻게?', '차이점은?', '자신의 말로 설명하시오' 같은 개방형 질문. 모범 답안과 키워드 3~5개 포함. " +
+                "객관식: 개념 이해를 확인하는 4지선다 문제. 정답 1개, 그럴듯한 오답 3개. " +
+                "대화 중 튜터가 이미 직접 물어본 질문을 그대로 반복하지 마세요.";
+
         List<Map<String, String>> messages = List.of(
-                Map.of("role", "system", "content",
-                        "당신은 교육 평가 전문가입니다. 튜터링 세션을 기반으로 역설명(recall) 질문을 생성하세요. " +
-                        "모든 질문, 모범 답안, 키워드는 반드시 한국어로 작성하세요. " +
-                        "아래 JSON 형식만 반환하세요: " +
-                        "{\"questions\": [{\"question\": \"질문 내용\", \"modelAnswer\": \"상세한 모범 답안\", " +
-                        "\"keywords\": [\"키워드1\", \"키워드2\"]}]}"),
-                Map.of("role", "user", "content",
-                        "학습 목차: " + outlineJson + "\n\n" +
-                        "대화 기록:\n" + historyStr + "\n\n" +
-                        "위 대화에서 다룬 핵심 개념을 확인할 수 있는 역설명 질문 3~5개를 한국어로 생성하세요. " +
-                        "단, 대화 중 튜터가 이미 직접 물어본 질문을 그대로 반복하지 마세요. " +
-                        "학습자가 개념을 자신의 말로 설명할 수 있는지 확인하는 새로운 각도의 질문을 만드세요. " +
-                        "예를 들어 '왜 그런가요?', '어떻게 동작하나요?', '~와의 차이점은?', '실제로 어떻게 활용되나요?' 같은 방식으로 접근하세요. " +
-                        "각 질문에는 상세한 모범 답안과 핵심 키워드 3~5개를 포함하세요.")
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userPrompt)
         );
 
         try {
@@ -132,7 +148,19 @@ public class LlmService {
                 String modelAnswer = item.path("modelAnswer").asText();
                 List<String> keywords = new ArrayList<>();
                 for (JsonNode kw : item.path("keywords")) keywords.add(kw.asText());
-                result.add(new QuestionData(question, modelAnswer, keywords));
+
+                QuestionType questionType = QuestionType.WRITTEN;
+                String typeStr = item.path("type").asText("");
+                if ("MULTIPLE_CHOICE".equals(typeStr)) {
+                    questionType = QuestionType.MULTIPLE_CHOICE;
+                }
+
+                String choicesJson = null;
+                if (questionType == QuestionType.MULTIPLE_CHOICE && item.has("choices")) {
+                    choicesJson = objectMapper.writeValueAsString(item.path("choices"));
+                }
+
+                result.add(new QuestionData(question, modelAnswer, keywords, questionType, choicesJson));
             }
             return result;
         } catch (ApiException e) {

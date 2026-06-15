@@ -1,5 +1,6 @@
 package com.ccp.skAI_castle_server.dto.response;
 
+import com.ccp.skAI_castle_server.domain.QuestionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,7 +17,7 @@ public class FinishSessionResponse {
     @Schema(description = "Created evaluation ID", example = "1")
     private Long evaluationId;
 
-    @Schema(description = "AI-generated recall questions to answer")
+    @Schema(description = "AI-generated recall questions to answer (subset of the full question pool)")
     private List<QuestionItem> questions;
 
     @Getter
@@ -33,5 +34,11 @@ public class FinishSessionResponse {
 
         @Schema(description = "Question text", example = "Explain what supervised learning is and provide a real-world example.")
         private String question;
+
+        @Schema(description = "Question type: WRITTEN or MULTIPLE_CHOICE", example = "WRITTEN")
+        private QuestionType questionType;
+
+        @Schema(description = "Answer choices for MULTIPLE_CHOICE questions (isCorrect is hidden until grading). Null for WRITTEN.")
+        private List<ChoiceItem> choices;
     }
 }

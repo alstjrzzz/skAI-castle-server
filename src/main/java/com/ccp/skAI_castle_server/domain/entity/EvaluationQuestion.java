@@ -1,5 +1,6 @@
 package com.ccp.skAI_castle_server.domain.entity;
 
+import com.ccp.skAI_castle_server.domain.QuestionType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -50,10 +51,20 @@ public class EvaluationQuestion extends BaseTimeEntity {
 
     private Integer lastScore; // score of the most recent review attempt
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private QuestionType questionType; // null treated as WRITTEN for backwards compatibility
+
+    @Column(columnDefinition = "TEXT")
+    private String choices; // JSON array for MC: [{"label":"A","text":"...","isCorrect":true}, ...]
+
+    private Boolean isRecallQuestion; // null treated as true for backwards compatibility
+
     @Builder
     private EvaluationQuestion(Evaluation evaluation, Integer questionOrder, String question,
                                 String modelAnswer, String userAnswer, LocalDate nextReviewDate,
-                                String keywords) {
+                                String keywords, QuestionType questionType, String choices,
+                                Boolean isRecallQuestion) {
         this.evaluation = evaluation;
         this.questionOrder = questionOrder;
         this.question = question;
@@ -62,6 +73,9 @@ public class EvaluationQuestion extends BaseTimeEntity {
         this.nextReviewDate = nextReviewDate;
         this.reviewCount = 0;
         this.keywords = keywords;
+        this.questionType = questionType != null ? questionType : QuestionType.WRITTEN;
+        this.choices = choices;
+        this.isRecallQuestion = isRecallQuestion != null ? isRecallQuestion : Boolean.TRUE;
     }
 
     public void submitAnswer(String userAnswer, int evaluationScore) {
@@ -81,5 +95,9 @@ public class EvaluationQuestion extends BaseTimeEntity {
         this.ef = ef;
         this.lastInterval = lastInterval;
         this.lastScore = score;
+    }
+
+    public boolean isRecall() {
+        return isRecallQuestion == null || Boolean.TRUE.equals(isRecallQuestion);
     }
 }

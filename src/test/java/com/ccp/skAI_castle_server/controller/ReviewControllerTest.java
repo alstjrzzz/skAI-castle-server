@@ -86,7 +86,7 @@ class ReviewControllerTest extends ControllerTestSupport {
                 .nextReviewDate(LocalDate.now().plusDays(6))
                 .reviewCount(2)
                 .build();
-        given(reviewService.completeReview(eq(1L), eq("An optimization algorithm"), eq(mockUser)))
+        given(reviewService.completeReview(eq(1L), any(), eq(mockUser)))
                 .willReturn(result);
 
         mockMvc.perform(post("/reviews/1/complete")
@@ -99,18 +99,6 @@ class ReviewControllerTest extends ControllerTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.score").value(75))
                 .andExpect(jsonPath("$.data.reviewCount").value(2));
-    }
-
-    @Test
-    void completeReview_blankAnswer_returns400() throws Exception {
-        mockMvc.perform(post("/reviews/1/complete")
-                        .with(mockAuth())
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"answer":""}
-                                """))
-                .andExpect(status().isBadRequest());
     }
 
     @Test

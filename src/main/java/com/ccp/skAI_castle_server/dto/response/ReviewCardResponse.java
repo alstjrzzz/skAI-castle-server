@@ -1,11 +1,13 @@
 package com.ccp.skAI_castle_server.dto.response;
 
+import com.ccp.skAI_castle_server.domain.QuestionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Builder
@@ -27,4 +29,10 @@ public class ReviewCardResponse {
 
     @Schema(description = "Scheduled review date", example = "2024-01-05")
     private LocalDate reviewDate;
+
+    @Schema(description = "Question type: WRITTEN or MULTIPLE_CHOICE", example = "WRITTEN")
+    private QuestionType questionType;
+
+    @Schema(description = "Answer choices for MULTIPLE_CHOICE questions (isCorrect is hidden until grading). Null for WRITTEN.")
+    private List<ChoiceItem> choices;
 }

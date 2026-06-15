@@ -2,10 +2,12 @@ package com.ccp.skAI_castle_server.service;
 
 import com.ccp.skAI_castle_server.domain.UserRole;
 import com.ccp.skAI_castle_server.domain.entity.*;
+import com.ccp.skAI_castle_server.dto.request.ReviewCompleteRequest;
 import com.ccp.skAI_castle_server.dto.response.ReviewCardResponse;
 import com.ccp.skAI_castle_server.dto.response.ReviewResultResponse;
 import com.ccp.skAI_castle_server.exception.ApiException;
 import com.ccp.skAI_castle_server.repository.EvaluationQuestionRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,7 +38,7 @@ class ReviewServiceTest {
 
     @BeforeEach
     void setUp() {
-        reviewService = new ReviewService(evaluationQuestionRepository, scoringService, sm2Service);
+        reviewService = new ReviewService(evaluationQuestionRepository, scoringService, sm2Service, new ObjectMapper());
         testUser = User.builder()
                 .email("test@example.com").password("encoded")
                 .nickname("Test").role(UserRole.USER).build();
@@ -53,6 +55,8 @@ class ReviewServiceTest {
         given(question.getEvaluation()).willReturn(evaluation);
         given(question.getReviewCount()).willReturn(2);
         given(question.getNextReviewDate()).willReturn(LocalDate.now());
+        given(question.getQuestionType()).willReturn(null);
+        given(question.getChoices()).willReturn(null);
         given(evaluation.getStudyTopic()).willReturn(topic);
         given(topic.getTitle()).willReturn("ML Fundamentals");
 
@@ -76,7 +80,7 @@ class ReviewServiceTest {
     }
 
     @Test
-    void completeReview_success_appliesSm2AndReturnsResult() {
+    void completeReview_writtenQuestion_appliesSm2AndReturnsResult() {
         EvaluationQuestion question = EvaluationQuestion.builder()
                 .evaluation(mock(Evaluation.class))
                 .questionOrder(1)
@@ -87,13 +91,16 @@ class ReviewServiceTest {
         ReflectionTestUtils.setField(question, "id", 1L);
         question.initReviewSchedule(LocalDate.now());
 
+        ReviewCompleteRequest request = mock(ReviewCompleteRequest.class);
+        given(request.getAnswer()).willReturn("gradient descent optimizes the loss");
+
         given(evaluationQuestionRepository.findByIdAndEvaluationUser(1L, testUser))
                 .willReturn(Optional.of(question));
         given(scoringService.score(anyString(), anyString(), anyString(), anyString())).willReturn(75);
         given(sm2Service.compute(anyInt(), anyInt(), any(Double.class), anyInt()))
                 .willReturn(new Sm2Service.Sm2Result(LocalDate.now().plusDays(6), 2, 2.5, 6));
 
-        ReviewResultResponse response = reviewService.completeReview(1L, "gradient descent optimizes the loss", testUser);
+        ReviewResultResponse response = reviewService.completeReview(1L, request, testUser);
 
         assertThat(response.getScore()).isEqualTo(75);
         assertThat(response.getReviewCount()).isEqualTo(2);
@@ -106,7 +113,8 @@ class ReviewServiceTest {
         given(evaluationQuestionRepository.findByIdAndEvaluationUser(99L, testUser))
                 .willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> reviewService.completeReview(99L, "answer", testUser))
+        ReviewCompleteRequest request = mock(ReviewCompleteRequest.class);
+        assertThatThrownBy(() -> reviewService.completeReview(99L, request, testUser))
                 .isInstanceOf(ApiException.class)
                 .satisfies(e -> assertThat(((ApiException) e).getResultCode()).isEqualTo(QUESTION_NOT_FOUND));
     }
@@ -122,6 +130,8 @@ class ReviewServiceTest {
         given(question.getEvaluation()).willReturn(evaluation);
         given(question.getReviewCount()).willReturn(3);
         given(question.getNextReviewDate()).willReturn(LocalDate.now());
+        given(question.getQuestionType()).willReturn(null);
+        given(question.getChoices()).willReturn(null);
         given(evaluation.getStudyTopic()).willReturn(topic);
         given(topic.getTitle()).willReturn("ML Fundamentals");
         given(evaluationQuestionRepository.findByIdAndEvaluationUser(1L, testUser))
